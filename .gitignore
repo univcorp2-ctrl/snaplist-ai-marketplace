@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.env
+snaplist.db
+node_modules/
+mobile/ios/App/Pods/
+mobile/ios/App/App/public/
+.DS_Store
