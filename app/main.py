@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import statistics
 import uuid
@@ -197,7 +196,11 @@ async def ai_draft(request: AnalyzeRequest) -> ListingDraft:
 
 async def publish_ebay(request: PublishRequest) -> PublishResult:
     if not settings.ebay_access_token:
-        return PublishResult(platform="ebay", mode="draft", message="EBAY_ACCESS_TOKEN未設定のため下書きを生成しました。")
+        return PublishResult(
+            platform="ebay",
+            mode="draft",
+            message="EBAY_ACCESS_TOKEN未設定のため下書きを生成しました。",
+        )
     required = [
         settings.ebay_merchant_location_key,
         settings.ebay_fulfillment_policy_id,
@@ -205,7 +208,11 @@ async def publish_ebay(request: PublishRequest) -> PublishResult:
         settings.ebay_return_policy_id,
     ]
     if not all(required) or not request.image_urls:
-        return PublishResult(platform="ebay", mode="draft", message="出品ポリシーまたは公開画像URLが不足しています。")
+        return PublishResult(
+            platform="ebay",
+            mode="draft",
+            message="出品ポリシーまたは公開画像URLが不足しています。",
+        )
     sku = f"snap-{uuid.uuid4().hex[:12]}"
     base = "https://api.ebay.com/sell/inventory/v1"
     headers = {
@@ -235,7 +242,12 @@ async def publish_ebay(request: PublishRequest) -> PublishResult:
             "categoryId": "88433",
             "listingDescription": request.draft.description,
             "merchantLocationKey": settings.ebay_merchant_location_key,
-            "pricingSummary": {"price": {"currency": "USD", "value": str(max(1, request.draft.price.recommended // 150))}},
+            "pricingSummary": {
+                "price": {
+                    "currency": "USD",
+                    "value": str(max(1, request.draft.price.recommended // 150)),
+                }
+            },
             "listingPolicies": {
                 "fulfillmentPolicyId": settings.ebay_fulfillment_policy_id,
                 "paymentPolicyId": settings.ebay_payment_policy_id,
@@ -248,9 +260,19 @@ async def publish_ebay(request: PublishRequest) -> PublishResult:
         offer_id = offer.json()["offerId"]
         published = await client.post(f"{base}/offer/{offer_id}/publish", headers=headers)
         if published.status_code >= 300:
-            return PublishResult(platform="ebay", mode="error", listing_id=offer_id, message=published.text[:300])
+            return PublishResult(
+                platform="ebay",
+                mode="error",
+                listing_id=offer_id,
+                message=published.text[:300],
+            )
         listing_id = published.json().get("listingId")
-    return PublishResult(platform="ebay", mode="published", listing_id=listing_id, message="eBayへ公開しました。")
+    return PublishResult(
+        platform="ebay",
+        mode="published",
+        listing_id=listing_id,
+        message="eBayへ公開しました。",
+    )
 
 
 def assisted(platform: str) -> PublishResult:
@@ -284,7 +306,9 @@ async def analyze(request: AnalyzeRequest) -> ListingDraft:
         return await ai_draft(request)
     except (httpx.HTTPError, KeyError, ValueError, json.JSONDecodeError) as exc:
         fallback = mock_draft(request)
-        fallback.warnings.append(f"AIゲートウェイに接続できずデモ解析へ切替: {type(exc).__name__}")
+        fallback.warnings.append(
+            f"AIゲートウェイに接続できずデモ解析へ切替: {type(exc).__name__}"
+        )
         return fallback
 
 
@@ -303,12 +327,28 @@ async def publish(request: PublishRequest) -> list[PublishResult]:
                     (listing_id, request.draft.title, request.draft.model_dump_json()),
                 )
                 conn.commit()
-            results.append(PublishResult(platform=platform, mode="published", listing_id=listing_id, url=f"/api/listings/{listing_id}", message="自社ストアへ保存しました。"))
+            results.append(
+                PublishResult(
+                    platform=platform,
+                    mode="published",
+                    listing_id=listing_id,
+                    url=f"/api/listings/{listing_id}",
+                    message="自社ストアへ保存しました。",
+                )
+            )
         elif key == "ebay":
             results.append(await publish_ebay(request))
         elif key == "yahoo-shopping":
-            mode = "draft" if not settings.yahoo_shopping_access_token else "draft"
-            results.append(PublishResult(platform=platform, mode=mode, message="Yahoo!ショッピング公式API用データを生成しました。ストア固有カテゴリ確認後に送信してください。"))
+            results.append(
+                PublishResult(
+                    platform=platform,
+                    mode="draft",
+                    message=(
+                        "Yahoo!ショッピング公式API用データを生成しました。"
+                        "ストア固有カテゴリ確認後に送信してください。"
+                    ),
+                )
+            )
         else:
             results.append(assisted(platform))
     return results
@@ -317,7 +357,15 @@ async def publish(request: PublishRequest) -> list[PublishResult]:
 @app.get("/api/listings/{listing_id}")
 def get_listing(listing_id: str) -> dict[str, Any]:
     with closing(sqlite3.connect(db_path())) as conn:
-        row = conn.execute("SELECT id, title, payload, created_at FROM listings WHERE id = ?", (listing_id,)).fetchone()
+        row = conn.execute(
+            "SELECT id, title, payload, created_at FROM listings WHERE id = ?",
+            (listing_id,),
+        ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="listing not found")
-    return {"id": row[0], "title": row[1], "draft": json.loads(row[2]), "created_at": row[3]}
+    return {
+        "id": row[0],
+        "title": row[1],
+        "draft": json.loads(row[2]),
+        "created_at": row[3],
+    }
