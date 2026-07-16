@@ -1,0 +1,1 @@
+{"name":"snaplist-ios-wrapper","private":true,"version":"0.1.0","scripts":{"sync:ios":"npx cap sync ios","open:ios":"npx cap open ios","add:ios":"npx cap add ios"},"dependencies":{"@capacitor/core":"^7.0.0","@capacitor/ios":"^7.0.0"},"devDependencies":{"@capacitor/cli":"^7.0.0","typescript":"^5.7.0"}}
