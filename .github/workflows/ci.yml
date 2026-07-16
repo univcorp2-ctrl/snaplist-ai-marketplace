@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check app tests
+      - name: Compile
+        run: python -m compileall -q app
+      - name: Test
+        run: pytest -q
+      - name: Validate web files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          json.loads(Path('web/manifest.webmanifest').read_text())
+          assert '<title>SnapList AI</title>' in Path('web/index.html').read_text()
+          assert 'serviceWorker' in Path('web/app.js').read_text()
+          print('web validation ok')
+          PY
+      - name: Upload PWA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplist-pwa
+          path: web/
+          if-no-files-found: error
