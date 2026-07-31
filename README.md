@@ -1,50 +1,39 @@
 # SnapList AI Marketplace
 
-写真を撮るだけで、商品候補・状態・説明文・相場レンジ・推奨価格を生成し、複数マーケット向けの出品データへ変換するオープンソース基盤です。
+写真から商品情報を整理し、メルカリ、Yahoo!オークション、ラクマ、Yahoo!フリマ向けの確認用下書きと商品台帳を作るオープンソースPWAです。
 
-**公開Web/PWA:** https://snaplist-ai-marketplace.pages.dev
+公開Web/PWA: https://snaplist-ai-marketplace.pages.dev
 
-![SnapList AI architecture](docs/assets/architecture.svg)
+> 個人向けマーケットプレイスへの自動ログイン・自動投稿は行いません。写真だけで型番、真贋、動作、傷を断定せず、出品者が必ず最終確認します。
 
-> **実装範囲**: Web/PWAはAPIキーなしでも動作します。自社ストアはFastAPI/SQLiteで実出品できます。eBayは公式Inventory APIコネクタを実装しています。Yahoo!ショッピングは公式APIへ接続するための設定とデータ変換を用意しています。メルカリ、ラクマ、個人向けYahoo!オークションは一般公開の出品APIが確認できないため、安全な下書き生成・CSV/JSON出力・公式画面への引き渡し方式です。
+## 主な機能
 
-## できること
+- スマートフォンのカメラ撮影、複数写真、ドラッグ＆ドロップ
+- ブラウザ内画像圧縮と圧縮サムネイル保存
+- API解析と、APIキーなしで使える決定論的なデモ生成
+- 商品名、ブランド、状態、型番、付属品、配送、価格、仕入、手数料、送料の編集
+- 早く売る・おすすめ・利益重視の参考価格
+- 想定手数料、仕入、送料を含む簡易利益計算
+- メルカリ、Yahoo!オークション、ラクマ、Yahoo!フリマ向け販路別下書き
+- タイトル、説明文、全体のワンクリックコピー
+- Yahoo!フリマ専用掲載モード
+- 下書き、出品中、売却済み、保留の商品台帳
+- UTF-8 BOM付きCSV、写真を含まないJSONの入出力
+- PWA、オフラインキャッシュ、iPhoneのホーム画面追加
 
-- iPhone/スマートフォンのカメラ撮影または写真アップロード
-- AI Visionによる商品名、ブランド、カテゴリ、状態、特徴の抽出
-- 相場レンジ、早期売却価格、推奨価格、利益重視価格の算出
-- 日本語の商品タイトル・説明・注意事項の生成と訂正
-- 自社ストア、eBay、Yahoo!ショッピング向けコネクタ
-- メルカリ、ラクマ、Yahoo!オークション向け入力済み下書き
-- JSON/CSV出力、PWAインストール、iPhone用Capacitor土台
-- API停止時にも動くブラウザ内デモモード
+## すぐ使う
 
-## アーキテクチャ
+公開URLをスマートフォンで開きます。写真を追加し、商品ヒントを入力して「写真から出品案を作る」を押してください。API未設定時は写真を外部送信せず、端末内デモ生成を使います。
 
-```mermaid
-flowchart LR
-  A[カメラ/写真] --> B[Web PWA]
-  B --> C{AI Provider}
-  C -->|OpenAI互換API| D[Vision解析]
-  C -->|社内Gateway| D
-  C -->|許可済みローカルCLI| D
-  D --> E[商品情報正規化]
-  E --> F[相場調査エンジン]
-  F --> G[価格提案・文章生成]
-  G --> H{出品コネクタ}
-  H --> I[自社ストア/SQLite]
-  H --> J[eBay公式API]
-  H --> K[Yahoo!ショッピング公式API]
-  H --> L[国内C2C下書き/CSV/JSON]
-```
+商品情報を確認し、販路を選択すると確認用下書きが表示されます。コピーした内容を各サービスの公式画面で確認して出品してください。
 
-詳細:
-- [システム構成](docs/architecture.md)
-- [初期設定](docs/setup.md)
-- [既存OSS・API調査](docs/research.md)
-- [iPhoneラッパー](mobile/README.md)
+## 商品台帳とバックアップ
 
-## ローカル起動
+商品台帳はブラウザの `localStorage` に保存されます。ブラウザデータを消すと失われるため、定期的にJSONを書き出してください。JSON/CSVには商品写真を含みません。元写真は端末側で保管してください。
+
+## APIモード
+
+ローカル起動:
 
 ```bash
 cp .env.example .env
@@ -52,54 +41,41 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
 uvicorn app.main:app --reload
-```
-
-別ターミナル:
-
-```bash
 python -m http.server 3000 -d web
 ```
 
-`http://localhost:3000` を開き、API設定に `http://localhost:8000` を保存します。API未接続時はブラウザ内デモ解析へ切り替わります。
+Webの設定画面に `http://localhost:8000` を登録し、写真送信への同意をオンにします。APIキーはブラウザに置かず、FastAPI側の環境変数または許可済みゲートウェイへ設定します。
 
-## AIゲートウェイ
-
-```dotenv
-AI_PROVIDER=openai-compatible
-AI_GATEWAY_URL=https://api.openai.com/v1
-AI_GATEWAY_API_KEY=...
-AI_MODEL=gpt-4.1-mini
-```
-
-社内OpenAI互換ゲートウェイへ差し替え可能です。月額契約済みCLIを使う場合はローカル環境だけで許可し、本番サーバーでは任意コマンド実行を無効にします。ブラウザへAPIキーは置きません。
-
-## 出品モード
-
-| プラットフォーム | モード | 条件 |
-|---|---|---|
-| 自社ストア | 自動 | SQLite、将来PostgreSQLへ移行可能 |
-| eBay | 自動 | OAuth、出品ポリシー、公開画像URL |
-| Yahoo!ショッピング | 公式連携準備 | ストア契約、OAuth、Seller ID |
-| メルカリ | アシスト | 入力済み下書き・画像・JSON/CSV |
-| ラクマ | アシスト | 入力済み下書き・画像・JSON/CSV |
-| Yahoo!オークション個人 | アシスト | 入力済み下書き・JSON/CSV |
-
-## iPhone
-
-公開URLをSafariで開き、共有メニューの「ホーム画面に追加」でカメラ対応PWAとして利用できます。App Store配布用のCapacitor設定は `mobile/` にあります。実配布時だけApple Developer Program、Bundle ID、署名、プライバシー表示、審査が必要です。
-
-## テストとCI
+## 開発・テスト
 
 ```bash
+pip install -e '.[dev]'
 ruff check app tests
-pytest
+pytest -q
+npm test
 ```
 
-GitHub Actionsはpush、PR、手動実行に対応し、lint、Pythonコンパイル、APIテスト、静的PWA検査を行い、Webバンドルをartifactとして保存します。
+GitHub ActionsはPython lint、compile、APIテスト、Webロジックテスト、PWA静的検査を実行します。
 
-## セキュリティ
+## 規約と安全性
 
-SecretsはGitHubへコミットしません。マーケットプレイスのパスワード保存、CAPTCHA/MFA回避、非公開API、規約違反になり得るブラウザ自動操作は実装していません。AI推定の型番・真贋・状態・付属品は公開前に編集画面で確認します。
+- マーケットプレイスのID、パスワード、Cookieを収集しません。
+- CAPTCHA/MFA回避、非公開API、スクレイピング、個人向けサービスへの無人出品は実装しません。
+- Yahoo!フリマは他販路と同時選択できない専用掲載モードです。
+- 規約は変更されるため、実際の出品前に各サービスの最新公式ルールを確認してください。
+- 市場データ未取得時の価格候補は相場ではなく、入力価格からの参考計算です。
+
+詳細:
+
+- [Torimaを参考にした設計方針](docs/torima-inspired-design.md)
+- [規約・セキュリティ方針](docs/compliance.md)
+- [商品台帳データモデル](docs/data-model.md)
+- [システム構成](docs/architecture.md)
+- [初期設定](docs/setup.md)
+
+## 今後のコネクタ方針
+
+自動出品は、正式契約と公開APIが確認できる販路だけを独立コネクタとして追加します。個人向け国内C2Cは、公式の一般向け出品APIと明確な許可が確認できるまでは、下書き、CSV、JSON、公式画面での本人確認操作に限定します。
 
 ## License
 
