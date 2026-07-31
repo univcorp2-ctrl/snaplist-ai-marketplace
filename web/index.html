@@ -1,1 +1,166 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111827"><meta name="description" content="写真1枚から相場と出品文を生成するAIクロスリスティングPWA"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="styles.css"><title>SnapList AI</title></head><body><header class="topbar"><a class="brand" href="#"><span class="logo">S</span><span>SnapList AI</span></a><span class="badge">OPEN SOURCE MVP</span></header><main><section class="hero"><div><p class="eyebrow">PHOTO → PRICE → LISTING</p><h1>撮るだけで、<br><span>売れる出品案</span>まで。</h1><p>商品の写真から情報を整理し、相場・推奨価格・説明文を生成。複数プラットフォーム向けの下書きを一括で作成します。</p></div><div class="hero-stat"><strong>60秒</strong><span>出品案の作成目安</span></div></section><section class="workspace"><div class="panel upload-panel"><div class="panel-head"><div><span class="step">1</span><h2>写真を追加</h2></div><button id="settingsBtn" class="ghost">API設定</button></div><label class="dropzone"><input id="photoInput" type="file" accept="image/*" capture="environment"><img id="preview" alt="商品写真プレビュー" hidden><div id="emptyState"><div class="camera">◎</div><strong>カメラで撮影 / 写真を選択</strong><span>正面・背面・型番・傷の写真があると精度が上がります</span></div></label><div class="fields two"><label>商品ヒント<input id="productHint" placeholder="例: SEIKO ダイバーズウォッチ"></label><label>状態<select id="condition"><option>新品、未使用</option><option>未使用に近い</option><option selected>目立った傷や汚れなし</option><option>やや傷や汚れあり</option><option>傷や汚れあり</option></select></label></div><button id="analyzeBtn" class="primary" disabled><span>AIで商品を解析する</span><span>→</span></button></div><div class="panel result-panel"><div class="panel-head"><div><span class="step">2</span><h2>出品内容を確認</h2></div><span id="status" class="status">写真を追加してください</span></div><div id="resultEmpty" class="result-empty"><div>✦</div><p>解析結果と相場がここに表示されます</p></div><div id="result" hidden><div class="price-grid"><div><span>相場レンジ</span><strong id="rangePrice">—</strong></div><div class="recommended"><span>おすすめ価格</span><strong id="recommendedPrice">—</strong></div><div><span>早く売る</span><strong id="quickPrice">—</strong></div></div><div class="fields"><label>タイトル<input id="title"></label><label>商品説明<textarea id="description" rows="8"></textarea></label></div><div class="meta-grid"><label>ブランド<input id="brand"></label><label>カテゴリ<input id="category"></label><label>状態<input id="resultCondition"></label></div><h3>参考相場</h3><div id="samples" class="samples"></div><h3>出品先</h3><div class="platforms"><label><input type="checkbox" value="own-store" checked><span>自社ストア<small>自動</small></span></label><label><input type="checkbox" value="ebay"><span>eBay<small>公式API</small></span></label><label><input type="checkbox" value="yahoo-shopping"><span>Yahoo!ショッピング<small>公式API</small></span></label><label><input type="checkbox" value="mercari" checked><span>メルカリ<small>下書き</small></span></label><label><input type="checkbox" value="rakuma"><span>ラクマ<small>下書き</small></span></label><label><input type="checkbox" value="yahoo-auction"><span>Yahoo!オークション<small>下書き</small></span></label></div><div class="actions"><button id="exportBtn" class="secondary">JSON/CSVを書き出す</button><button id="publishBtn" class="primary">選択先へ出品準備</button></div><div id="publishResults" class="publish-results"></div></div></div></section></main><dialog id="settingsDialog"><form method="dialog"><h2>API設定</h2><label>FastAPI URL<input id="apiBase" placeholder="http://localhost:8000"></label><p>未設定または接続できない場合はブラウザ内デモ解析へ切り替わります。</p><div class="actions"><button value="cancel" class="secondary">閉じる</button><button id="saveSettings" value="default" class="primary">保存</button></div></form></dialog><div id="toast" class="toast" hidden></div><script src="app.js" defer></script></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="写真から販路別の出品下書きと商品台帳を作る、安全なマルチマーケット出品アシスタント">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>SnapList AI</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" data-view-link="composer" aria-label="SnapList AI 新規出品へ">
+      <span class="logo" aria-hidden="true">S</span><span>SnapList AI</span>
+    </a>
+    <nav class="nav-tabs" aria-label="メインメニュー">
+      <button class="nav-tab active" data-view="composer">新規出品</button>
+      <button class="nav-tab" data-view="inventory">商品台帳 <span id="navCount" class="count-badge">0</span></button>
+      <button id="settingsBtn" class="nav-tab">設定</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="composerView" class="view">
+      <div class="hero compact-hero">
+        <div>
+          <p class="eyebrow">PHOTO → DRAFT → INVENTORY</p>
+          <h1>撮って、確認して、<br><span>出品準備をひとまとめ。</span></h1>
+          <p>写真と最低限の情報から、各販路向けの下書きを作成します。外部サービスへの自動ログインや自動投稿は行いません。</p>
+        </div>
+        <div class="mode-card"><span id="modeDot" class="mode-dot"></span><strong id="modeLabel">端末内デモモード</strong><small id="networkLabel">オンライン</small></div>
+      </div>
+
+      <ol class="stepper" aria-label="出品準備の流れ">
+        <li class="active" data-step="1"><span>1</span>写真</li>
+        <li data-step="2"><span>2</span>確認</li>
+        <li data-step="3"><span>3</span>販路別下書き</li>
+        <li data-step="4"><span>4</span>保存</li>
+      </ol>
+
+      <section class="panel capture-panel" aria-labelledby="photoHeading">
+        <div class="panel-head">
+          <div><span class="step-number">1</span><div><h2 id="photoHeading">商品の写真</h2><p>正面・背面・型番・傷の順に最大4枚まで</p></div></div>
+          <button id="clearPhotosBtn" class="ghost" type="button">写真をクリア</button>
+        </div>
+        <label id="dropzone" class="dropzone" for="photoInput">
+          <input id="photoInput" type="file" accept="image/*" capture="environment" multiple>
+          <span class="camera" aria-hidden="true">◎</span>
+          <strong>カメラで撮影 / 写真を選択</strong>
+          <small>ドラッグ＆ドロップにも対応。画像は保存前に圧縮されます。</small>
+        </label>
+        <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
+        <div class="quick-fields">
+          <label>商品ヒント<input id="productHint" placeholder="例：SEIKO ダイバーズウォッチ"></label>
+          <label>状態
+            <select id="quickCondition">
+              <option>新品、未使用</option><option>未使用に近い</option>
+              <option selected>目立った傷や汚れなし</option><option>やや傷や汚れあり</option><option>傷や汚れあり</option>
+            </select>
+          </label>
+        </div>
+        <div class="notice info"><strong>写真の扱い</strong><span id="photoPrivacyText">API未接続時は写真を外部送信せず、端末内のデモ生成だけを使います。</span></div>
+        <button id="analyzeBtn" class="primary wide" type="button" disabled>写真から出品案を作る <span aria-hidden="true">→</span></button>
+      </section>
+
+      <section id="editorSection" class="panel" hidden aria-labelledby="editorHeading">
+        <div class="panel-head">
+          <div><span class="step-number">2</span><div><h2 id="editorHeading">商品情報を確認</h2><p>AI推定やデモ生成をそのまま公開せず、必ず修正してください。</p></div></div>
+          <span id="analysisSource" class="source-badge">デモ生成</span>
+        </div>
+        <form id="listingForm" novalidate>
+          <div class="form-grid two">
+            <label class="span-2">商品名 <span class="required">必須</span><input name="name" required></label>
+            <label>ブランド<input name="brand" placeholder="不明なら要確認"></label>
+            <label>カテゴリ<input name="category"></label>
+            <label>状態 <span class="required">必須</span>
+              <select name="condition" required><option>新品、未使用</option><option>未使用に近い</option><option>目立った傷や汚れなし</option><option>やや傷や汚れあり</option><option>傷や汚れあり</option></select>
+            </label>
+            <label>カラー<input name="color"></label>
+            <label>サイズ<input name="size"></label>
+            <label>型番<input name="model" placeholder="不明なら要確認"></label>
+            <label class="span-2">付属品<input name="accessories"></label>
+            <label class="span-2">傷・注意点<textarea name="flaws" rows="3"></textarea></label>
+            <label>配送方法<input name="shippingMethod"></label>
+            <label>発送日数<select name="shippingDays"><option>1〜2日で発送</option><option selected>2〜3日で発送</option><option>4〜7日で発送</option></select></label>
+            <label>販売価格 <span class="required">必須</span><input name="price" type="number" min="1" inputmode="numeric" required></label>
+            <label>仕入価格<input name="cost" type="number" min="0" inputmode="numeric"></label>
+            <label>想定手数料率（%）<input name="feeRate" type="number" min="0" max="100" step="0.1"></label>
+            <label>想定送料<input name="shippingCost" type="number" min="0" inputmode="numeric"></label>
+            <label class="span-2">社内メモ（出品文には含めません）<textarea name="notes" rows="2"></textarea></label>
+          </div>
+        </form>
+        <div id="validationErrors" class="notice danger" hidden aria-live="assertive"></div>
+
+        <div class="price-layout">
+          <div class="price-options" aria-labelledby="priceHeading">
+            <h3 id="priceHeading">参考価格</h3>
+            <p>市場相場ではなく、入力価格を基準にした参考計算です。</p>
+            <div class="price-grid">
+              <button type="button" data-price-kind="quick"><span>早く売る</span><strong id="quickPrice">—</strong></button>
+              <button type="button" data-price-kind="recommended" class="recommended"><span>おすすめ</span><strong id="recommendedPrice">—</strong></button>
+              <button type="button" data-price-kind="premium"><span>利益重視</span><strong id="premiumPrice">—</strong></button>
+            </div>
+          </div>
+          <div class="profit-card">
+            <h3>簡易利益計算</h3>
+            <dl><div><dt>販売価格</dt><dd id="profitSale">—</dd></div><div><dt>手数料</dt><dd id="profitFee">—</dd></div><div><dt>仕入＋送料</dt><dd id="profitCosts">—</dd></div><div class="profit-total"><dt>想定利益</dt><dd id="profitValue">—</dd></div></dl>
+          </div>
+        </div>
+      </section>
+
+      <section id="platformSection" class="panel" hidden aria-labelledby="platformHeading">
+        <div class="panel-head"><div><span class="step-number">3</span><div><h2 id="platformHeading">出品先を選ぶ</h2><p>下書きを作る販路を選択してください。</p></div></div></div>
+        <div id="platformChoices" class="platform-grid">
+          <label><input type="checkbox" data-platform="mercari" checked><span><strong>メルカリ</strong><small>確認用下書き</small></span></label>
+          <label><input type="checkbox" data-platform="yahoo-auction"><span><strong>Yahoo!オークション</strong><small>確認用下書き</small></span></label>
+          <label><input type="checkbox" data-platform="rakuma"><span><strong>ラクマ</strong><small>確認用下書き</small></span></label>
+          <label class="exclusive"><input type="checkbox" data-platform="yahoo-fleamarket"><span><strong>Yahoo!フリマ</strong><small>専用掲載モード</small></span></label>
+        </div>
+        <div class="notice warning"><strong>規約確認</strong><span>Yahoo!フリマの専用掲載モードでは他販路を同時選択できません。規約は変更されるため、出品前に各サービスの公式ルールを確認してください。</span></div>
+        <div id="draftsContainer" class="drafts-grid" aria-live="polite"></div>
+        <div class="footer-actions">
+          <button id="exportCurrentBtn" class="secondary" type="button">現在の商品をJSONで保存</button>
+          <button id="saveItemBtn" class="primary" type="button">商品台帳へ保存</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="inventoryView" class="view" hidden aria-labelledby="inventoryHeading">
+      <div class="inventory-hero"><div><p class="eyebrow">LOCAL INVENTORY</p><h1 id="inventoryHeading">商品台帳</h1><p>このブラウザに保存した出品準備データです。画像は圧縮サムネイルのみ保存されます。</p></div><button id="newItemBtn" class="primary" type="button">＋ 新しい商品</button></div>
+      <div id="inventoryStats" class="stats-grid"></div>
+      <section class="panel">
+        <div class="inventory-toolbar">
+          <label class="search-label">商品を検索<input id="inventorySearch" type="search" placeholder="商品名・ブランド・型番"></label>
+          <label>状態で絞る<select id="statusFilter"><option value="all">すべて</option><option value="draft">下書き</option><option value="listed">出品中</option><option value="sold">売却済み</option><option value="hold">保留</option></select></label>
+          <div class="toolbar-actions"><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportCsvBtn" class="secondary" type="button">CSV</button><label class="secondary file-button">JSON読込<input id="importInput" type="file" accept="application/json"></label></div>
+        </div>
+        <div id="inventoryList" class="inventory-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-form">
+      <h2>API設定</h2>
+      <p>FastAPIを設定すると、明示的に同意した場合だけ写真を解析APIへ送信します。APIキーはブラウザへ保存しません。</p>
+      <label>FastAPI URL<input id="apiBase" type="url" placeholder="http://localhost:8000"></label>
+      <label class="check-row"><input id="allowImageUpload" type="checkbox">写真を設定先APIへ送信することに同意する</label>
+      <div class="footer-actions"><button value="cancel" class="secondary">閉じる</button><button id="saveSettings" value="default" class="primary">保存</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="exclusiveDialog">
+    <form method="dialog" class="dialog-form">
+      <h2>Yahoo!フリマ専用モードへ切り替えますか？</h2>
+      <p>現在選択中の他販路を解除し、この商品をYahoo!フリマ専用の下書きとして扱います。</p>
+      <div class="footer-actions"><button value="cancel" class="secondary">キャンセル</button><button value="confirm" class="primary">切り替える</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
