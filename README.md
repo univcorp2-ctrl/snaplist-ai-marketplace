@@ -2,7 +2,7 @@
 
 写真から商品情報を整理し、メルカリ、Yahoo!オークション、ラクマ、Yahoo!フリマ向けの確認用下書きと商品台帳を作るオープンソースPWAです。
 
-公開Web/PWA: https://snaplist-ai-marketplace.pages.dev
+公開Web/PWA: [SnapList AIを開く](https://snaplist-ai-marketplace.pages.dev/?release=torima-mvp-v2)
 
 > 個人向けマーケットプレイスへの自動ログイン・自動投稿は行いません。写真だけで型番、真贋、動作、傷を断定せず、出品者が必ず最終確認します。
 
