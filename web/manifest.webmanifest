@@ -1,1 +1,14 @@
-{"name":"SnapList AI Marketplace","short_name":"SnapList AI","description":"写真から相場と出品案を作るAIクロスリスティングPWA","start_url":"./","display":"standalone","background_color":"#090f1c","theme_color":"#111827","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "name": "SnapList AI Marketplace Assistant",
+  "short_name": "SnapList AI",
+  "description": "写真から販路別の出品下書きと商品台帳を作るPWA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#0b1220",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
