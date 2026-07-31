@@ -45,7 +45,7 @@ jobs:
           assert 'capture="environment"' in html
           assert 'serviceWorker' in app
           assert 'yahoo-fleamarket' in core
-          assert '\ufeff' in core
+          assert 'ufeff' in core
           print('web validation ok')
           PY
       - name: Upload PWA artifact
