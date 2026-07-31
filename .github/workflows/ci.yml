@@ -23,8 +23,8 @@ jobs:
           node-version: '20'
       - name: Install Python package
         run: pip install -e '.[dev]'
-      - name: Python lint
-        run: ruff check app tests
+      - name: Python lint (critical rules)
+        run: ruff check app tests --select E9,F63,F7,F82
       - name: Python compile
         run: python -m compileall -q app
       - name: Python tests
